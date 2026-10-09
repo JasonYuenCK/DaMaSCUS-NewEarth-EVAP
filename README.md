@@ -72,13 +72,6 @@ Dense-position tolerance metadata was corrected with a runtime overload
 returning `2.0e-3 * radial_grid.Inner_Bin_Width_Km()`, so Earth output now
 reports the Earth-scaled tolerance.
 
-The full test suite passed at `100% tests passed, 0 tests failed out of 17`,
-with focused trajectory tests at `37/37 passed`, covering snapshot, runtime
-Earth radial grid, data generation, MPI, trajectory, physics validation, solar
-model, and build/config tests. The simulation code refactor is complete: the
-pipeline is fully runtime body-dependent, numerically stable, and validated by
-the full test suite.
-
 ## Main Changes
 
 Compared with the upstream DaMaSCUS-SUN workflow, this branch emphasizes:
@@ -91,8 +84,7 @@ Compared with the upstream DaMaSCUS-SUN workflow, this branch emphasizes:
 - optional richer survival diagnostics behind explicit diagnostic paths;
 - MPI-aware snapshot output for long parameter-point jobs;
 - safeguards for pathological trajectories and low-capture-rate runs;
-- server-friendly local configuration conventions, with generated binaries,
-  job scripts, and run configs kept outside version control under `bin/`.
+
 
 ## Build And Deployment
 
