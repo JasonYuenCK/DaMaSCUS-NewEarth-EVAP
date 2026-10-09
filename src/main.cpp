@@ -134,6 +134,23 @@ int main(int argc, char* argv[])
 					<< "\tTotal mass [kg]:       "
 					<< In_Units(g_body_mass, kg) << std::endl
 					<< "##############################################################" << std::endl;
+			const double v_mean = cfg.DM_distr->Average_Speed();
+			const double eta_zero = cfg.DM_distr->Eta_Function(0.0);
+			const double v_esc_surface =
+					celestial_model->Local_Escape_Speed(g_body_radius);
+
+			const double v_eff =
+					v_mean + v_esc_surface * v_esc_surface * eta_zero;
+
+			std::cout << "Incident-flux normalization check" << std::endl
+					<< "  <u> [km/s]:       "
+					<< In_Units(v_mean, km / sec) << std::endl
+					<< "  <1/u> [s/km]:     "
+					<< In_Units(eta_zero, sec / km) << std::endl
+					<< "  v_esc(R) [km/s]:  "
+					<< In_Units(v_esc_surface, km / sec) << std::endl
+					<< "  v_eff [km/s]:    "
+					<< In_Units(v_eff, km / sec) << std::endl;
 		}
 	}
 catch(const std::exception& error)
