@@ -1,89 +1,36 @@
 DaMaSCUS-SUN-EVAP
-Dark Matter Simulation Code for the Sun, with capture- and evaporation-focused
-extensions, now supporting runtime body-dependent radial grids for Earth-based
-studies.
+Dark Matter Simulation Code for the Sun, with capture- and evaporation-focused extensions, now supporting runtime body-dependent radial grids for Earth-based studies.
 
 Overview
-DaMaSCUS-SUN-EVAP builds on
-DaMaSCUS-SUN and keeps its central
-Monte Carlo picture: dark matter particles are propagated through the solar
-potential, scatter on solar targets, and are classified from their trajectory
-history. This branch is organized around production workflows for low-mass dark
-matter capture and evaporation studies rather than broad direct-detection scans.
+DaMaSCUS-SUN-EVAP builds on DaMaSCUS-SUN and keeps its central Monte Carlo picture: dark matter particles are propagated through the solar potential, scatter on solar targets, and are classified from their trajectory history. This branch is organized around production workflows for low-mass dark matter capture and evaporation studies rather than broad direct-detection scans.
 
 The current code path is centered on two practical modes:
 
-Capture mode: a fast capture-rate workflow. It terminates a trajectory once
-a post-scatter bound state is identified and avoids the full evaporation and
-histogram output path.
+Capture mode: a fast capture-rate workflow. It terminates a trajectory once a post-scatter bound state is identified and avoids the full evaporation and histogram output path.
 
-Parameter-point simulation: the main evaporation workflow for one mass and
-cross section. It accumulates time-weighted radial histograms, records complete
-valid evaporation events, and can emit wall-clock snapshot progress files for
-long MPI runs.
+Parameter-point simulation: the main evaporation workflow for one mass and cross section. It accumulates time-weighted radial histograms, records complete valid evaporation events, and can emit wall-clock snapshot progress files for long MPI runs.
 
-The older parameter-scan machinery is still present, but the most actively
-maintained outputs in this branch are the capture summary and the single
-parameter-point evaporation products.
+The older parameter-scan machinery is still present, but the most actively maintained outputs in this branch are the capture summary and the single parameter-point evaporation products.
 
 Runtime Body-Dependent Radial Grid Refactor
-The simulation code has been fully refactored from a fixed Sun-centered radial
-grid to a runtime, body-dependent radial grid. The same trajectory, bincount,
-Kepler exterior arc, snapshot, heartbeat, merge, MPI, final output, and
-diagnostic pipeline now works for both Sun and Earth without hard-coded solar
-constants. All major numerical stability issues, including the RK45 timeout
-pathology, have been resolved.
+The simulation code has been fully refactored from a fixed Sun-centered radial grid to a runtime, body-dependent radial grid. The same trajectory, bincount, Kepler exterior arc, snapshot, heartbeat, merge, MPI, final output, and diagnostic pipeline now works for both Sun and Earth without hard-coded solar constants. All major numerical stability issues, including the RK45 timeout pathology, have been resolved.
 
-The fixed constants R_SUN_KM, NUM_BINS, TOTAL_BINS, and BIN_WIDTH_KM
-were replaced by a runtime Bincount_Radial_Grid that builds body-specific
-inner and exterior bins from the target body radius, with Earth runs using a
-0.001 R_body inner bin width, while the legacy Sun API is preserved for
-backward compatibility. Trajectory histograms changed from fixed arrays to
-runtime-sized vectors, and Hermite bincount deposition as well as Kepler
-exterior arc accumulation now use the passed-in runtime grid instead of fixed
-Sun constants. Trajectory_Simulator now holds a runtime radial grid and
-provides an explicit-grid constructor, with the same grid shared across
-bincount deposition, Kepler exterior arcs, and trajectory histogram allocation.
+The fixed constants R_SUN_KM, NUM_BINS, TOTAL_BINS, and BIN_WIDTH_KM were replaced by a runtime Bincount_Radial_Grid that builds body-specific inner and exterior bins from the target body radius, with Earth runs using a 0.001 R_body inner bin width, while the legacy Sun API is preserved for backward compatibility. Trajectory histograms changed from fixed arrays to runtime-sized vectors, and Hermite bincount deposition as well as Kepler exterior arc accumulation now use the passed-in runtime grid instead of fixed Sun constants. Trajectory_Simulator now holds a runtime radial grid and provides an explicit-grid constructor, with the same grid shared across bincount deposition, Kepler exterior arcs, and trajectory histogram allocation.
 
-Snapshot binary checkpoints, shared state, report state, merge, and heartbeat
-all support runtime histogram lengths and runtime radial grids, and snapshot
-reports now output body-neutral metadata using r_lower_Rbody and
-r_upper_Rbody. Aggregate histograms, jackknife storage and indexing, MPI
-reductions, bincount.txt, residence_jackknife_blocks.tsv, and
-run_metadata.json all use runtime bin counts and Rbody-normalized schema.
+Snapshot binary checkpoints, shared state, report state, merge, and heartbeat all support runtime histogram lengths and runtime radial grids, and snapshot reports now output body-neutral metadata using r_lower_Rbody and r_upper_Rbody. Aggregate histograms, jackknife storage and indexing, MPI reductions, bincount.txt, residence_jackknife_blocks.tsv, and run_metadata.json all use runtime bin counts and Rbody-normalized schema.
 
-All diagnostic outputs migrated from Rsun to Rbody normalization, including
-evaporation output, snapshot evaporation output, trajectory summary, trajectory
-events, and invalid trajectory ledger, with output versions and binary
-checkpoint versions incremented to avoid misreading old Rsun-normalized data.
+All diagnostic outputs migrated from Rsun to Rbody normalization, including evaporation output, snapshot evaporation output, trajectory summary, trajectory events, and invalid trajectory ledger, with output versions and binary checkpoint versions incremented to avoid misreading old Rsun-normalized data.
 
-Several numerical stability issues were fixed: the radial free-flight center
-crossing now correctly flips r, v_radial, and axis_x instead of clamping
-to zero; the Kepler exterior radial-grid edge classification near 1.1 R_body
-was corrected; an unbound outward-escape fallback ensures unbound, outward,
-scatter-free trajectories terminate correctly; and free-propagation timeout
-diagnostics were added for state inspection at timeout. The high-cross-section
-RK45 timeout pathology has also been resolved, with the root causes being the
-radial center-crossing clamp and the missing unbound outward-escape termination,
-so large timeout warning counts no longer appear in high-cross-section scans.
-Dense-position tolerance metadata was corrected with a runtime overload
-returning 2.0e-3 * radial_grid.Inner_Bin_Width_Km(), so Earth output now
-reports the Earth-scaled tolerance.
+Several numerical stability issues were fixed: the radial free-flight center crossing now correctly flips r, v_radial, and axis_x instead of clamping to zero; the Kepler exterior radial-grid edge classification near 1.1 R_body was corrected; an unbound outward-escape fallback ensures unbound, outward, scatter-free trajectories terminate correctly; and free-propagation timeout diagnostics were added for state inspection at timeout. The high-cross-section RK45 timeout pathology has also been resolved, with the root causes being the radial center-crossing clamp and the missing unbound outward-escape termination, so large timeout warning counts no longer appear in high-cross-section scans. Dense-position tolerance metadata was corrected with a runtime overload returning 2.0e-3 * radial_grid.Inner_Bin_Width_Km(), so Earth output now reports the Earth-scaled tolerance.
 
-The full test suite passed at 100% tests passed, 0 tests failed out of 17,
-with focused trajectory tests at 37/37 passed, covering snapshot, runtime
-Earth radial grid, data generation, MPI, trajectory, physics validation, solar
-model, and build/config tests. The simulation code refactor is complete: the
-pipeline is fully runtime body-dependent, numerically stable, and validated by
-the full test suite.
+The full test suite passed at 100% tests passed, 0 tests failed out of 17, with focused trajectory tests at 37/37 passed, covering snapshot, runtime Earth radial grid, data generation, MPI, trajectory, physics validation, solar model, and build/config tests. The simulation code refactor is complete: the pipeline is fully runtime body-dependent, numerically stable, and validated by the full test suite.
 
 Main Changes
 Compared with the upstream DaMaSCUS-SUN workflow, this branch emphasizes:
 
 runtime, body-dependent radial grids instead of fixed solar constants;
 
-in-memory radial bincount accumulation instead of writing full trajectory
-files;
+in-memory radial bincount accumulation instead of writing full trajectory files;
 
 capture detection from the first post-scatter negative-energy state;
 
@@ -95,8 +42,7 @@ MPI-aware snapshot output for long parameter-point jobs;
 
 safeguards for pathological trajectories and low-capture-rate runs;
 
-server-friendly local configuration conventions, with generated binaries,
-job scripts, and run configs kept outside version control under bin/.
+server-friendly local configuration conventions, with generated binaries, job scripts, and run configs kept outside version control under bin/.
 
 Build And Deployment
 Dependencies
@@ -117,15 +63,7 @@ On Ubuntu/Debian, install the native prerequisites with:
 bash
 sudo apt-get update
 sudo apt-get install -y build-essential cmake git libboost-dev libconfig++-dev libopenmpi-dev openmpi-bin python3
-On macOS with Homebrew:
-
-bash
-brew install cmake boost libconfig open-mpi
-The first CMake configure downloads obscura v1.0.1 and libphysica v0.1.2
-under the build tree's _deps/ directory. Their exact Git commits are pinned by the root CMake project.
-GoogleTest is fetched only when BUILD_TESTING=ON. Internet access is therefore
-needed on the first configure unless those FetchContent source directories have
-already been populated.
+The first CMake configure downloads obscura v1.0.1 and libphysica v0.1.2 under the build tree's _deps/ directory. Their exact Git commits are pinned by the root CMake project. GoogleTest is fetched only when BUILD_TESTING=ON. Internet access is therefore needed on the first configure unless those FetchContent source directories have already been populated.
 
 Local Build
 bash
@@ -136,8 +74,7 @@ cmake -S . -B build \
   -DCODE_COVERAGE=OFF
 cmake --build build --config Release --parallel
 cmake --install build --config Release
-This produces a self-contained project install layout (apart from the native
-MPI and libconfig++ shared libraries):
+This produces a self-contained project install layout (apart from the native MPI and libconfig++ shared libraries):
 
 text
 install/
@@ -150,15 +87,9 @@ Verify the fresh install with the tracked, intentionally tiny configuration:
 bash
 mpirun -np 1 ./install/bin/DaMaSCUS-SUN \
   ./install/share/DaMaSCUS-SUN/examples/quickstart.cfg
-The installed program locates model_agss09.dat relative to its own executable,
-not relative to the checkout or the current working directory. The complete
-install/ directory can therefore be moved to another location on the same
-machine. Do not copy only the executable; copy the whole install prefix.
+The installed program locates model_agss09.dat relative to its own executable, not relative to the checkout or the current working directory. The complete install/ directory can therefore be moved to another location on the same machine. Do not copy only the executable; copy the whole install prefix.
 
-Native binaries still use the MPI and libconfig++ libraries from the build
-machine. When moving to a machine with a different OS, CPU architecture, MPI
-implementation, or module stack, rebuild there. On module-based clusters, load
-the same compiler/MPI/libconfig modules for both build and execution.
+Native binaries still use the MPI and libconfig++ libraries from the build machine. When moving to a machine with a different OS, CPU architecture, MPI implementation, or module stack, rebuild there. On module-based clusters, load the same compiler/MPI/libconfig modules for both build and execution.
 
 Cluster Deployment
 A typical cluster checkout follows the same pattern:
@@ -173,30 +104,22 @@ cmake -S . -B build \
   -DCODE_COVERAGE=OFF
 cmake --build build --config Release --parallel
 cmake --install build --config Release
-Keep machine-specific configuration, batch scripts, and scheduler output outside
-the install prefix (the repository's ignored bin/ directory is one option).
+Keep machine-specific configuration, batch scripts, and scheduler output outside the install prefix (the repository's ignored bin/ directory is one option).
 
 Run a parameter point with MPI:
 
 bash
 mpirun -np 8 ./install/bin/DaMaSCUS-SUN /absolute/path/to/config.cfg
-For a scheduler, wrap the same executable/config pair in the local batch script
-used by that machine.
+For a scheduler, wrap the same executable/config pair in the local batch script used by that machine.
 
-If a nonstandard packaging layout stores the solar table elsewhere, set either
-an exact file or its containing directory:
+If a nonstandard packaging layout stores the solar table elsewhere, set either an exact file or its containing directory:
 
 bash
 export DAMASCUS_SUN_SOLAR_MODEL=/absolute/path/model_agss09.dat
 # or: export DAMASCUS_SUN_DATA_DIR=/absolute/path/to/data
-To build and run the test suite, configure separately with
--DBUILD_TESTING=ON, build, then run ctest --test-dir build --output-on-failure.
+To build and run the test suite, configure separately with -DBUILD_TESTING=ON, build, then run ctest --test-dir build --output-on-failure.
 
-The radial residence domain is a compile-time setting because its bin count is
-part of the fixed histogram layout. Keep alternate cutoffs in separate build
-directories and provide both the cutoff and the matching number of exterior
-shells. The default is 1 AU with 423 exterior bins. For example, a
-5.2-AU comparison build uses:
+The radial residence domain is a compile-time setting because its bin count is part of the fixed histogram layout. Keep alternate cutoffs in separate build directories and provide both the cutoff and the matching number of exterior shells. The default is 1 AU with 423 exterior bins. For example, a 5.2-AU comparison build uses:
 
 bash
 cmake -S . -B build-5p2au \
@@ -205,8 +128,7 @@ cmake -S . -B build-5p2au \
   -DDAMASCUS_RADIAL_DOMAIN_MAX_AU=5.2 \
   -DDAMASCUS_EXTERIOR_BINS=527
 cmake --build build-5p2au --target DaMaSCUS-SUN --parallel
-Grid initialization rejects a mismatched bin count when the generated shells
-either stop short of the chosen domain or reach it before the final bin.
+Grid initialization rejects a mismatched bin count when the generated shells either stop short of the chosen domain or reach it before the final bin.
 
 Configuration
 Configuration files use libconfig syntax. The most important controls are:
@@ -225,185 +147,69 @@ maximum_number_of_scatterings	Per-trajectory computational cutoff. Cutoff-termin
 snapshot_enabled	Enables intermediate wall-clock progress reports for parameter-point runs. Disabled automatically in capture mode.
 snapshot_interval	Positive integer wall-clock spacing, in seconds, for snapshot reports. Defaults to 60 seconds when snapshots are enabled.
 max_trajectory_wall_time_sec	Optional per-trajectory wall-time guard. Snapshot recorder overhead is excluded from this budget.
-MPI trajectory scheduling uses a dynamic RMA work queue. Every rank claims one
-trajectory at a time and releases its slot immediately on completion, so fast
-ranks continue working without waiting at a per-batch collective for the
-slowest trajectory. The queue maintains
-accepted_samples + in_flight <= sample_size; therefore the final exact-target
-tail may temporarily leave excess ranks idle, but
-capture_target_overshoot remains zero. Output headers report
-mpi_scheduler_work_claims and mpi_scheduler_peak_in_flight.
+MPI trajectory scheduling uses a dynamic RMA work queue. Every rank claims one trajectory at a time and releases its slot immediately on completion, so fast ranks continue working without waiting at a per-batch collective for the slowest trajectory. The queue maintains accepted_samples + in_flight <= sample_size; therefore the final exact-target tail may temporarily leave excess ranks idle, but capture_target_overshoot remains zero. Output headers report mpi_scheduler_work_claims and mpi_scheduler_peak_in_flight.
 
-For reproducible MPI runs, a nonzero fixed seed is expanded by rank as
-base_seed + 1000003 * mpi_rank. Computational cutoffs are tracked separately
-from physical right-censoring so that final evaporation-time files contain only
-complete valid unbinding events. Numerical failures and computational
-truncations are recorded and replaced; their accumulated fraction does not
-stop the work queue. Use max_trajectories when an explicit attempt budget is
-required.
+For reproducible MPI runs, a nonzero fixed seed is expanded by rank as base_seed + 1000003 * mpi_rank. Computational cutoffs are tracked separately from physical right-censoring so that final evaporation-time files contain only complete valid unbinding events. Numerical failures and computational truncations are recorded and replaced; their accumulated fraction does not stop the work queue. Use max_trajectories when an explicit attempt budget is required.
 
-A trajectory can become physically bound only at a scattering. If an
-uncaptured trajectory acquires negative energy during scatter-free propagation,
-the run classifies that trajectory as a numerical failure instead of allowing
-repeated bound Kepler returns to stall its MPI batch.
+A trajectory can become physically bound only at a scattering. If an uncaptured trajectory acquires negative energy during scatter-free propagation, the run classifies that trajectory as a numerical failure instead of allowing repeated bound Kepler returns to stall its MPI batch.
 
 Outputs
-For non-capture parameter-point runs, the final files are written after MPI
-reduction:
+For non-capture parameter-point runs, the final files are written after MPI reduction:
 
-bincount.txt: capture-conditioned residence-time and v^2 dt radial
-histograms with error estimates. The radial grid is body-dependent at runtime:
-for a Sun run it is uniform at 0.001 R_sun through 1.1 R_sun, and for an
-Earth run it is uniform at 0.001 R_body through 1.1 R_body. From there,
-shell widths start continuously at the inner bin width and grow geometrically
-by 2% per shell toward a global width cap. The default 1-AU domain ends before
-that cap is reached and uses 423 exterior shells. Radial columns are reported
-as r_lower_Rbody and r_upper_Rbody. Negative-energy
-exterior Kepler arcs contribute exact shell integrals. A captured orbit whose
-apoapsis exceeds 1 AU is propagated analytically to its outward 1-AU
-crossing, marked outer_domain_removal, and contributes capture plus
-residence statistics through that crossing. It does not contribute an
-evaporation-time event. Captured trajectories stopped by a wall-time guard
-retain their accepted residence prefix, are counted as computationally
-censored, and are replaced by a new trajectory without entering the invalid
-fraction or the evaporation-time table. Step- and scattering-count guards
-also retain their accepted residence prefix but remain computational
-truncations. Numerical failures are excluded from residence statistics.
-Accepted numerical RK
-intervals are conservatively split using
-adaptive Hermite dense output. Uncaptured residence histograms are not
-written because capture membership gates every residence contribution.
+bincount.txt: capture-conditioned residence-time and v^2 dt radial histograms with error estimates. The radial grid is body-dependent at runtime: for a Sun run it is uniform at 0.001 R_sun through 1.1 R_sun, and for an Earth run it is uniform at 0.001 R_body through 1.1 R_body. From there, shell widths start continuously at the inner bin width and grow geometrically by 2% per shell toward a global width cap. The default 1-AU domain ends before that cap is reached and uses 423 exterior shells. Radial columns are reported as r_lower_Rbody and r_upper_Rbody. Negative-energy exterior Kepler arcs contribute exact shell integrals. A captured orbit whose apoapsis exceeds 1 AU is propagated analytically to its outward 1-AU crossing, marked outer_domain_removal, and contributes capture plus residence statistics through that crossing. It does not contribute an evaporation-time event. Captured trajectories stopped by a wall-time guard retain their accepted residence prefix, are counted as computationally censored, and are replaced by a new trajectory without entering the invalid fraction or the evaporation-time table. Step- and scattering-count guards also retain their accepted residence prefix but remain computational truncations. Numerical failures are excluded from residence statistics. Accepted numerical RK intervals are conservatively split using adaptive Hermite dense output. Uncaptured residence histograms are not written because capture membership gates every residence contribution.
 
-evaporation_times.txt: compact complete-event table with
-rank trajectory_id lifetime_unbinding_sec r_capture_Rbody E_capture_eV dE_capture_eV, followed by the number of negative-energy exterior arcs,
-the first/last/maximum osculating Kepler periods at outward 1.1 R_body
-crossings, and the corresponding first/last/maximum analytic exterior
-return times. It is sorted by
-lifetime_unbinding_sec with rank trajectory_id tie-breakers.
+evaporation_times.txt: compact complete-event table with rank trajectory_id lifetime_unbinding_sec r_capture_Rbody E_capture_eV dE_capture_eV, followed by the number of negative-energy exterior arcs, the first/last/maximum osculating Kepler periods at outward 1.1 R_body crossings, and the corresponding first/last/maximum analytic exterior return times. It is sorted by lifetime_unbinding_sec with rank trajectory_id tie-breakers.
 
-residence_jackknife_blocks.tsv: exactly 64 deterministic blocks assigned by
-splitmix64(base_seed, rank, trajectory_id) % 64. Each block contains
-attempted, captured, completed uncaptured escape, accepted residence,
-invalid, and outer-domain-removal counts plus its full radial dt and
-v^2 dt histograms. The writer refuses to publish the file unless every
-scalar count and every radial bin closes against bincount.txt. It is the
-required input for delete-one-block propagation of capture-rate/residence
-covariance into shell and channel flux uncertainties.
+residence_jackknife_blocks.tsv: exactly 64 deterministic blocks assigned by splitmix64(base_seed, rank, trajectory_id) % 64. Each block contains attempted, captured, completed uncaptured escape, accepted residence, invalid, and outer-domain-removal counts plus its full radial dt and v^2 dt histograms. The writer refuses to publish the file unless every scalar count and every radial bin closes against bincount.txt. It is the required input for delete-one-block propagation of capture-rate/residence covariance into shell and channel flux uncertainties.
 
-invalid_trajectories.tsv: always-on, replayable ledger for trajectories
-excluded by numerical or computational validity rules. It is header-only
-when no invalid trajectory occurred. Each row records the failure stage,
-exact termination reason and numerical-failure detail, boundary/reference
-energy diagnostics, capture/survival state, final kinematics, shifted initial
-condition, and the std::mt19937 states before initial-condition generation
-and before trajectory simulation.
+invalid_trajectories.tsv: always-on, replayable ledger for trajectories excluded by numerical or computational validity rules. It is header-only when no invalid trajectory occurred. Each row records the failure stage, exact termination reason and numerical-failure detail, boundary/reference energy diagnostics, capture/survival state, final kinematics, shifted initial condition, and the std::mt19937 states before initial-condition generation and before trajectory simulation.
 
 Replay one ledger row with the installed helper:
 
 bash
 replay-invalid-trajectory CONFIG.cfg invalid_trajectories.tsv RANK TRAJECTORY_ID
-The helper restores the recorded pre-simulation RNG state and shifted initial
-condition, reruns the current trajectory implementation, and prints the
-original/replayed reason, failure detail, final state, and diagnostic-event
-count. It reads only the current ledger schema; old ledger compatibility is not
-provided.
+The helper restores the recorded pre-simulation RNG state and shifted initial condition, reruns the current trajectory implementation, and prints the original/replayed reason, failure detail, final state, and diagnostic-event count. It reads only the current ledger schema; old ledger compatibility is not provided.
 
-The terminal summary and bincount.txt header report captured and uncaptured
-counts for every TrajectoryTerminationReason and every concrete numerical
-failure detail. This breakdown is always available; it is not gated by
-trajectory_summary_enabled.
+The terminal summary and bincount.txt header report captured and uncaptured counts for every TrajectoryTerminationReason and every concrete numerical failure detail. This breakdown is always available; it is not gated by trajectory_summary_enabled.
 
-Optional trajectory diagnostics are enabled with trajectory_summary_enabled = true.
-This adds run_metadata.json, trajectory_summary.tsv, and
-trajectory_events.tsv without changing the capture or evaporation state
-definitions. Set trajectory_events_enabled = true and
-trajectory_trace_rate in [0, 1] to select lifecycle traces by a stable hash;
-set trajectory_trace_seed to keep that selection identical across runs. The
-selection does not consume the physics RNG. Traced trajectories include the
-complete pre-initial-condition std::mt19937 state and shifted initial
-condition, plus real-time scatter, state-transition, solar-crossing, escape,
-censoring, and numerical-failure events.
+Optional trajectory diagnostics are enabled with trajectory_summary_enabled = true. This adds run_metadata.json, trajectory_summary.tsv, and trajectory_events.tsv without changing the capture or evaporation state definitions. Set trajectory_events_enabled = true and trajectory_trace_rate in [0, 1] to select lifecycle traces by a stable hash; set trajectory_trace_seed to keep that selection identical across runs. The selection does not consume the physics RNG. Traced trajectories include the complete pre-initial-condition std::mt19937 state and shifted initial condition, plus real-time scatter, state-transition, solar-crossing, escape, censoring, and numerical-failure events.
 
-The bound-exit period is the point-mass osculating Kepler period inferred from
-the negative-energy state at the outward 1.1 R_body matching surface. The
-exterior elapsed time is the physically used analytic travel time: through
-apoapsis to the inbound matching surface for contained arcs, or one-way to the
-outward 1-AU removal point for outer-domain arcs. These are kept separate
-because the osculating full period includes a point-mass continuation through
-the body interior, whereas the simulation uses the extended body potential
-there.
+The bound-exit period is the point-mass osculating Kepler period inferred from the negative-energy state at the outward 1.1 R_body matching surface. The exterior elapsed time is the physically used analytic travel time: through apoapsis to the inbound matching surface for contained arcs, or one-way to the outward 1-AU removal point for outer-domain arcs. These are kept separate because the osculating full period includes a point-mass continuation through the body interior, whereas the simulation uses the extended body potential there.
 
-The bincount.txt and snapshot report headers expose both capture_rate_raw
-(captured / all attempted) and capture_rate_valid (captured / physically
-classified), with separate standard errors and Wilson intervals.
+The bincount.txt and snapshot report headers expose both capture_rate_raw (captured / all attempted) and capture_rate_valid (captured / physically classified), with separate standard errors and Wilson intervals.
 
 When snapshots are enabled, intermediate files are written under snapshot/:
 
-snapshot_{time}s.txt: cumulative progress report at the snapshot wall time.
-Its commented [MPI rank status] table reports each rank's activity, local
-trajectory ID, trajectory wall time, simulated elapsed time, scattering
-count, and the rank-local observation time. An in-progress trajectory that
-has already captured contributes its accumulated residence prefix
-provisionally. If its bound exterior arc crosses the 1-AU removal surface,
-the forced publication includes the one-way residence integral through that
-crossing. Status rows remain comments so data readers see only bincount bins.
+snapshot_{time}s.txt: cumulative progress report at the snapshot wall time. Its commented [MPI rank status] table reports each rank's activity, local trajectory ID, trajectory wall time, simulated elapsed time, scattering count, and the rank-local observation time. An in-progress trajectory that has already captured contributes its accumulated residence prefix provisionally. If its bound exterior arc crosses the 1-AU removal surface, the forced publication includes the one-way residence integral through that crossing. Status rows remain comments so data readers see only bincount bins.
 
-snapshot_{time}s_evaporation_times.txt: complete valid evaporation events
-first published by that checkpoint, sorted by lifetime_unbinding_sec.
-An event committed concurrently with a snapshot boundary is assigned once to
-the next checkpoint rather than being dropped.
+snapshot_{time}s_evaporation_times.txt: complete valid evaporation events first published by that checkpoint, sorted by lifetime_unbinding_sec. An event committed concurrently with a snapshot boundary is assigned once to the next checkpoint rather than being dropped.
 
-Snapshot files are progress diagnostics. They do not replace the final
-post-reduction bincount.txt and evaporation_times.txt products, and they are
-not restart checkpoints. A report can temporarily have snapshot_status = partial while ranks publish their state. If a rank misses the deadline, the
-report remains incomplete rather than reconstructing state that was not
-captured. Final rank states are retained when the last merge is incomplete.
-Snapshot reports likewise expose attempted, classified, unresolved, and
-numerical_failures counts plus raw and valid capture-rate intervals. The
-uncaptured-bound free-flight guard records its failures in these cumulative
-reports without printing one warning for every failed trajectory.
+Snapshot files are progress diagnostics. They do not replace the final post-reduction bincount.txt and evaporation_times.txt products, and they are not restart checkpoints. A report can temporarily have snapshot_status = partial while ranks publish their state. If a rank misses the deadline, the report remains incomplete rather than reconstructing state that was not captured. Final rank states are retained when the last merge is incomplete. Snapshot reports likewise expose attempted, classified, unresolved, and numerical_failures counts plus raw and valid capture-rate intervals. The uncaptured-bound free-flight guard records its failures in these cumulative reports without printing one warning for every failed trajectory.
 
-The executable requests MPI_THREAD_FUNNELED; only the main thread calls MPI,
-while one heartbeat thread per rank performs local state copies and file I/O.
-Concurrent jobs must use distinct output directories.
+The executable requests MPI_THREAD_FUNNELED; only the main thread calls MPI, while one heartbeat thread per rank performs local state copies and file I/O. Concurrent jobs must use distinct output directories.
 
-Snapshot checkpoint I/O is supported on homogeneous POSIX (Linux/macOS) MPI
-nodes sharing the output filesystem. The binary checkpoint representation is
-local to a run and is not a portable interchange or restart format.
+Snapshot checkpoint I/O is supported on homogeneous POSIX (Linux/macOS) MPI nodes sharing the output filesystem. The binary checkpoint representation is local to a run and is not a portable interchange or restart format.
 
-Capture-mode runs skip the full output path and print the capture summary
-instead.
+Capture-mode runs skip the full output path and print the capture summary instead.
 
 Physics Validation
-The ordinary test suite now includes a physics-validation gate for analytic
-Kepler convergence, body-profile structure, incident impact-parameter
-sampling, scattering-angle sampling, and the Maxwell thermal-speed limit:
+The ordinary test suite now includes a physics-validation gate for analytic Kepler convergence, body-profile structure, incident impact-parameter sampling, scattering-angle sampling, and the Maxwell thermal-speed limit:
 
 bash
 ctest --test-dir build --output-on-failure -L physics-validation
-The runtime body-dependent radial grid refactor is additionally covered by
-regression tests for Hermite runtime binning, Kepler exterior arc runtime
-binning, snapshot runtime histogram lengths, runtime-size merge, and Earth
-final-output schema.
+The runtime body-dependent radial grid refactor is additionally covered by regression tests for Hermite runtime binning, Kepler exterior arc runtime binning, snapshot runtime histogram lengths, runtime-size merge, and Earth final-output schema.
 
-Production results should additionally pass the slower grid-and-seed
-convergence matrix described in
-validation/README.md. It compares direct scattering
-rates with interpolated grids using capture-rate confidence intervals, average
-scattering counts, radial distributions, evaporation-time statistics, and the
-numerical-failure fraction.
+Production results should additionally pass the slower grid-and-seed convergence matrix described in validation/README.md. It compares direct scattering rates with interpolated grids using capture-rate confidence intervals, average scattering counts, radial distributions, evaporation-time statistics, and the numerical-failure fraction.
 
 Citation
-If this branch is used in analysis, cite this repository using CITATION.cff
-and cite the original DaMaSCUS-SUN work where appropriate.
+If this branch is used in analysis, cite this repository using CITATION.cff and cite the original DaMaSCUS-SUN work where appropriate.
 
 Useful references:
 
-T. Emken and C. Kouvaris,
-DaMaSCUS-SUN
+T. Emken and C. Kouvaris, DaMaSCUS-SUN
 
 Garani and Palomares-Ruiz, evaporation of dark matter in the Sun
 
 License
-This project is distributed under the MIT License. See LICENSE for the
-upstream and modification copyright notices.
+This project is distributed under the MIT License. See LICENSE for the upstream and modification copyright notices.
+
