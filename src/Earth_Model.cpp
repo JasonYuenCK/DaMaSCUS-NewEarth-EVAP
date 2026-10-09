@@ -1,4 +1,5 @@
 #include "Earth_Model.hpp"
+#include "Solar_Model.hpp"  // for Thermal_Averaged_Relative_Speed
 
 #include <algorithm>
 #include <cmath>
@@ -344,12 +345,12 @@ const std::string& Earth_Model::Model_File() const
 
 double Earth_Model::Radius() const
 {
-	return 6371.0 * km;
+	return rEarth;
 }
 
 double Earth_Model::Total_Mass() const
 {
-	return 5.9722e24 * kg;
+	return mEarth;
 }
 
 double Earth_Model::Mass(double r)
@@ -513,10 +514,12 @@ double Earth_Model::Total_DM_Scattering_Rate_Interpolated(obscura::DM_Particle& 
 
 void Earth_Model::Interpolate_Total_DM_Scattering_Rate(obscura::DM_Particle& DM, unsigned int N_radius, unsigned int N_speed)
 {
-	if(N_radius == 0 || N_speed == 0)
+	// Interpolation_2D must not be constructed with a 1x1 or 2x2 grid.
+	// Use direct scattering-rate evaluation for undersized grids.
+	if(N_radius < 3 || N_speed < 3)
 	{
-		using_interpolated_rate = false;
-		return;
+	        using_interpolated_rate = false;
+	        return;
 	}
 
 	int mpi_processes = 1;
