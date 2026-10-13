@@ -719,6 +719,16 @@ void Simulation_Data::Generate_Data(obscura::DM_Particle& DM, Celestial_Model& s
 		if(mpi_thread_level < MPI_THREAD_FUNNELED)
 			throw std::runtime_error("snapshot heartbeat requires MPI_THREAD_FUNNELED or stronger thread support");
 	}
+	// Make the nondeterministic seed observable and replayable.
+	if(fixed_seed == 0)
+	{
+		if(mpi_rank == 0)
+		{
+			std::random_device rd;
+			do { fixed_seed = rd(); } while(fixed_seed == 0);
+		}
+		MPI_Bcast(&fixed_seed, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+	}
 	diagnostic_base_seed = fixed_seed;
 	diagnostic_run_id = 0;
 	if(evaporation_diagnostics_enabled && mpi_rank == 0)
@@ -1112,11 +1122,9 @@ void Simulation_Data::Generate_Data(obscura::DM_Particle& DM, Celestial_Model& s
 			    && trajectory.bincount.event_observed
 			    && trajectory.bincount.termination_reason
 			       == TrajectoryTerminationReason::OutwardEscape;
-			const bool accepted_residence_sample =
-			    !capture_mode
-			    && trajectory.bincount.is_captured
-			    && !TrajectoryTerminationInvalidatesResidenceBincount(
-			        trajectory.bincount.termination_reason);
+			// Production residence excludes any incomplete, truncated, or outer-removed
+			// history. Keep the existing termination categories for diagnostics.
+			const bool accepted_residence_sample = accepted_evaporation_sample;
 
 			if(trajectory.bincount.is_captured)
 			{
@@ -1306,6 +1314,9 @@ void Simulation_Data::Generate_Data(obscura::DM_Particle& DM, Celestial_Model& s
 	    maximum_trajectories,
 	    INITIAL_SHIFT_FAILURE_ABORT_FRACTION,
 	    MPI_COMM_WORLD);
+	// Rank 0 must drive passive-target RMA progress from the main thread.
+	if(mpi_rank == 0 && mpi_processes > 1)
+	    simulator.Set_Progress_Callback([&work_queue]() { work_queue.Progress(); });
 	while(true)
 	{
 		MPIWorkQueueState observed;
@@ -1334,6 +1345,7 @@ void Simulation_Data::Generate_Data(obscura::DM_Particle& DM, Celestial_Model& s
 		print_progress_update(global_target_samples, false);
 	}
 
+	simulator.Set_Progress_Callback(nullptr);
 	const MPIWorkQueueState final_work_state =
 	    work_queue.Finalize();
 	global_target_samples =
